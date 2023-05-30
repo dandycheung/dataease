@@ -4,10 +4,12 @@ import com.alibaba.fastjson.JSONObject;
 import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class ApiDefinitionRequest {
-    private List<JSONObject> headers = new ArrayList<>();
+    private List<Map<String, String>> headers = new ArrayList<>();
+    private List<Map<String, String>> arguments = new ArrayList<>();
     private JSONObject body = new JSONObject();
     private AuthManager authManager = new AuthManager();
 

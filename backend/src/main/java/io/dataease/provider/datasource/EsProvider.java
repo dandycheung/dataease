@@ -1,18 +1,20 @@
 package io.dataease.provider.datasource;
 
-import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import io.dataease.commons.utils.HttpClientConfig;
 import io.dataease.commons.utils.HttpClientUtil;
-import io.dataease.controller.request.datasource.es.EsReponse;
+import io.dataease.controller.request.datasource.es.EsResponse;
 import io.dataease.controller.request.datasource.es.Request;
 import io.dataease.controller.request.datasource.es.RequestWithCursor;
-import io.dataease.controller.request.datasource.DatasourceRequest;
 import io.dataease.dto.datasource.EsConfiguration;
-import io.dataease.dto.datasource.TableDesc;
-import io.dataease.dto.datasource.TableField;
 import io.dataease.exception.DataEaseException;
 import io.dataease.i18n.Translator;
+import io.dataease.plugins.common.constants.datasource.EsSqlLConstants;
+import io.dataease.plugins.common.dto.datasource.TableDesc;
+import io.dataease.plugins.common.dto.datasource.TableField;
+import io.dataease.plugins.common.request.datasource.DatasourceRequest;
+import io.dataease.plugins.datasource.provider.Provider;
 import io.dataease.provider.query.es.EsQueryProvider;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
@@ -23,8 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service("es")
-public class EsProvider extends DatasourceProvider {
+@Service("esProviders")
+public class EsProvider extends Provider {
 
 
     /**
@@ -58,22 +60,22 @@ public class EsProvider extends DatasourceProvider {
             request.setFetch_size(dsr.getFetchSize());
             String url = esConfiguration.getUrl().endsWith("/") ? esConfiguration.getUrl() + esConfiguration.getUri() + "?format=json" : esConfiguration.getUrl() + "/" + esConfiguration.getUri() + "?format=json";
             String response = HttpClientUtil.post(url, new Gson().toJson(request), httpClientConfig);
-            EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
+            EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
 
-            list.addAll(fetchResult(esReponse));
+            list.addAll(fetchResult(esResponse));
             if (dsr.isPageable()) {
                 Integer realSize = dsr.getPage() * dsr.getPageSize() < list.size() ? dsr.getPage() * dsr.getPageSize() : list.size();
                 list = list.subList((dsr.getPage() - 1) * dsr.getPageSize(), realSize);
             }
             if (!dsr.isPreviewData()) {
-                while (StringUtils.isNotEmpty(esReponse.getCursor())) {
-                    RequestWithCursor requstWithCursor = new RequestWithCursor();
-                    requstWithCursor.setQuery(dsr.getQuery());
-                    requstWithCursor.setFetch_size(dsr.getFetchSize());
-                    requstWithCursor.setCursor(esReponse.getCursor());
-                    response = HttpClientUtil.post(url, new Gson().toJson(requstWithCursor), httpClientConfig);
-                    esReponse = new Gson().fromJson(response, EsReponse.class);
-                    list.addAll(fetchResult(esReponse));
+                while (StringUtils.isNotEmpty(esResponse.getCursor())) {
+                    RequestWithCursor requestWithCursor = new RequestWithCursor();
+                    requestWithCursor.setQuery(dsr.getQuery());
+                    requestWithCursor.setFetch_size(dsr.getFetchSize());
+                    requestWithCursor.setCursor(esResponse.getCursor());
+                    response = HttpClientUtil.post(url, new Gson().toJson(requestWithCursor), httpClientConfig);
+                    esResponse = new Gson().fromJson(response, EsResponse.class);
+                    list.addAll(fetchResult(esResponse));
                 }
             }
         } catch (Exception e) {
@@ -96,8 +98,8 @@ public class EsProvider extends DatasourceProvider {
     }
 
     @Override
-    public List<TableField> getTableFileds(DatasourceRequest datasourceRequest) throws Exception {
-        datasourceRequest.setQuery("desc " + datasourceRequest.getTable());
+    public List<TableField> getTableFields(DatasourceRequest datasourceRequest) throws Exception {
+        datasourceRequest.setQuery("desc " + String.format(EsSqlLConstants.KEYWORD_TABLE, datasourceRequest.getTable()));
         List<TableField> tableFields = new ArrayList<>();
         try {
             String response = exexQuery(datasourceRequest, datasourceRequest.getQuery(), "?format=json");
@@ -110,16 +112,16 @@ public class EsProvider extends DatasourceProvider {
 
 
     private List<String[]> fetchResult(String response) throws Exception {
-        EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
-        return fetchResult(esReponse);
+        EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
+        return fetchResult(esResponse);
     }
 
-    private List<String[]> fetchResult(EsReponse esReponse) throws Exception {
+    private List<String[]> fetchResult(EsResponse esResponse) throws Exception {
         List<String[]> list = new LinkedList<>();
-        if (esReponse.getError() != null) {
-            throw new Exception(esReponse.getError().getReason());
+        if (esResponse.getError() != null) {
+            throw new Exception(esResponse.getError().getReason());
         }
-        list.addAll(esReponse.getRows());
+        list.addAll(esResponse.getRows());
         return list;
     }
 
@@ -137,12 +139,12 @@ public class EsProvider extends DatasourceProvider {
 
     private List<TableField> fetchResultField(String response) throws Exception {
         List<TableField> fieldList = new ArrayList<>();
-        EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
-        if (esReponse.getError() != null) {
-            throw new Exception(esReponse.getError().getReason());
+        EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
+        if (esResponse.getError() != null) {
+            throw new Exception(esResponse.getError().getReason());
         }
 
-        for (String[] row : esReponse.getRows()) {
+        for (String[] row : esResponse.getRows()) {
             TableField field = new TableField();
             field.setFieldName(row[0]);
             field.setRemarks(row[0]);
@@ -155,12 +157,12 @@ public class EsProvider extends DatasourceProvider {
 
     private List<TableField> fetchResultField4Sql(String response) throws Exception {
         List<TableField> fieldList = new ArrayList<>();
-        EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
-        if (esReponse.getError() != null) {
-            throw new Exception(esReponse.getError().getReason());
+        EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
+        if (esResponse.getError() != null) {
+            throw new Exception(esResponse.getError().getReason());
         }
 
-        for (EsReponse.Column column : esReponse.getColumns()) {
+        for (EsResponse.Column column : esResponse.getColumns()) {
             TableField field = new TableField();
             field.setFieldName(column.getName());
             field.setRemarks(column.getName());
@@ -173,12 +175,12 @@ public class EsProvider extends DatasourceProvider {
 
     private List<TableField> fetchResultField4Table(String response) throws Exception {
         List<TableField> fieldList = new ArrayList<>();
-        EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
-        if (esReponse.getError() != null) {
-            throw new Exception(esReponse.getError().getReason());
+        EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
+        if (esResponse.getError() != null) {
+            throw new Exception(esResponse.getError().getReason());
         }
 
-        for (String[] row : esReponse.getRows()) {
+        for (String[] row : esResponse.getRows()) {
             if(!row[1].equalsIgnoreCase("STRUCT")){
                 TableField field = new TableField();
                 field.setFieldName(row[0]);
@@ -205,10 +207,6 @@ public class EsProvider extends DatasourceProvider {
     }
 
     @Override
-    public void handleDatasource(DatasourceRequest datasourceRequest, String type) throws Exception {
-    }
-
-    @Override
     public List<TableDesc> getTables(DatasourceRequest datasourceRequest) throws Exception {
         List<TableDesc> tables = new ArrayList<>();
         try {
@@ -223,12 +221,12 @@ public class EsProvider extends DatasourceProvider {
 
     private List<TableDesc> fetchTables(String response) throws Exception {
         List<TableDesc> tables = new ArrayList<>();
-        EsReponse esReponse = new Gson().fromJson(response, EsReponse.class);
-        if (esReponse.getError() != null) {
-            throw new Exception(esReponse.getError().getReason());
+        EsResponse esResponse = new Gson().fromJson(response, EsResponse.class);
+        if (esResponse.getError() != null) {
+            throw new Exception(esResponse.getError().getReason());
         }
 
-        for (String[] row : esReponse.getRows()) {
+        for (String[] row : esResponse.getRows()) {
             if (row.length == 3 && row[1].contains("TABLE") && row[2].equalsIgnoreCase("INDEX")) {
                 TableDesc tableDesc = new TableDesc();
                 tableDesc.setName(row[0]);
@@ -237,6 +235,11 @@ public class EsProvider extends DatasourceProvider {
             if (row.length == 2 && row[1].contains("TABLE")) {
                 TableDesc tableDesc = new TableDesc();
                 tableDesc.setName(row[0]);
+                tables.add(tableDesc);
+            }
+            if (row.length == 4 && row[2].contains("TABLE") && row[3].equalsIgnoreCase("INDEX")) {
+                TableDesc tableDesc = new TableDesc();
+                tableDesc.setName(row[1]);
                 tables.add(tableDesc);
             }
         }
@@ -251,13 +254,14 @@ public class EsProvider extends DatasourceProvider {
 
     @Override
     public String checkStatus(DatasourceRequest datasourceRequest) throws Exception {
+        Gson gson = new Gson();
         EsConfiguration esConfiguration = new Gson().fromJson(datasourceRequest.getDatasource().getConfiguration(), EsConfiguration.class);
         String response = exexGetQuery(datasourceRequest);
 
-        if (JSONObject.parseObject(response).getJSONObject("error") != null) {
-            throw new Exception(JSONObject.parseObject(response).getJSONObject("error").getString("reason"));
+        if (JsonParser.parseString(response).getAsJsonObject().getAsJsonObject("error") != null) {
+            throw new Exception(JsonParser.parseString(response).getAsJsonObject().getAsJsonObject("error").get("reason").getAsString());
         }
-        String version = JSONObject.parseObject(response).getJSONObject("version").getString("number");
+        String version = JsonParser.parseString(response).getAsJsonObject().getAsJsonObject("version").get("number").getAsString();
         String[] versionList = version.split("\\.");
         if (Integer.valueOf(versionList[0]) < 7 && Integer.valueOf(versionList[1]) < 3) {
             throw new Exception(Translator.get("i18n_es_limit"));
@@ -266,7 +270,7 @@ public class EsProvider extends DatasourceProvider {
         if (Integer.valueOf(versionList[0]) == 6) {
             esConfiguration.setUri("_xpack/sql");
         }
-        if (Integer.valueOf(versionList[0]) == 7) {
+        if (Integer.valueOf(versionList[0]) > 6) {
             esConfiguration.setUri("_sql");
         }
         datasourceRequest.getDatasource().setConfiguration(new Gson().toJson(esConfiguration));

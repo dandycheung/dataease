@@ -3,7 +3,10 @@ package io.dataease.controller.panel.server;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import io.dataease.auth.filter.F2CLinkFilter;
-import io.dataease.base.domain.PanelLink;
+import io.dataease.commons.constants.SysLogConstants;
+import io.dataease.commons.utils.DeLogUtils;
+import io.dataease.plugins.common.base.domain.PanelGroupWithBLOBs;
+import io.dataease.plugins.common.base.domain.PanelLink;
 import io.dataease.controller.panel.api.LinkApi;
 import io.dataease.controller.request.chart.ChartExtRequest;
 import io.dataease.controller.request.panel.link.*;
@@ -65,9 +68,14 @@ public class LinkServer implements LinkApi {
         link = URLDecoder.decode(link, "UTF-8");
         String json = panelLinkService.decryptParam(link);
 
+        String user = request.getUser();
+        user = URLDecoder.decode(user, "UTF-8");
+        user = panelLinkService.decryptParam(user);
+
         ValidateDto dto = new ValidateDto();
+        dto.setUserId(user);
         String resourceId = json;
-        PanelLink one = panelLinkService.findOne(resourceId, request.getUser());
+        PanelLink one = panelLinkService.findOne(resourceId, Long.valueOf(user));
         dto.setResourceId(resourceId);
         if (ObjectUtils.isEmpty(one)) {
             dto.setValid(false);
@@ -86,8 +94,8 @@ public class LinkServer implements LinkApi {
     }
 
     @Override
-    public Object resourceDetail(@PathVariable String resourceId) {
-        return panelLinkService.resourceInfo(resourceId);
+    public Object resourceDetail(@PathVariable String resourceId,@PathVariable String userId) {
+        return panelLinkService.resourceInfo(resourceId,userId);
     }
 
     @Override
@@ -105,5 +113,20 @@ public class LinkServer implements LinkApi {
     public String shortUrl(Map<String, String> param) {
         String resourceId = param.get("resourceId");
         return panelLinkService.getShortUrl(resourceId);
+    }
+
+    @Override
+    public void viewLinkLog(LinkViewLogRequest request) {
+        String panelId = request.getPanelId();
+        Boolean mobile = request.getMobile();
+        Long userId = request.getUserId();
+        SysLogConstants.OPERATE_TYPE operateType = SysLogConstants.OPERATE_TYPE.PC_VIEW;
+        if (ObjectUtils.isNotEmpty(mobile) && mobile) {
+            operateType = SysLogConstants.OPERATE_TYPE.MB_VIEW;
+        }
+        if (ObjectUtils.isEmpty(userId)) return;
+        PanelGroupWithBLOBs panelGroupWithBLOBs = panelLinkService.resourceInfo(panelId,String.valueOf(userId));
+        String pid = panelGroupWithBLOBs.getPid();
+        DeLogUtils.save(operateType, SysLogConstants.SOURCE_TYPE.LINK, panelId, pid, userId, SysLogConstants.SOURCE_TYPE.USER);
     }
 }

@@ -9,6 +9,10 @@ import io.dataease.commons.constants.DePermissionType;
 import io.dataease.commons.constants.ResourceAuthLevel;
 import io.dataease.commons.model.AuthURD;
 
+import io.dataease.plugins.config.SpringContextUtil;
+import io.dataease.plugins.xpack.auth.dto.request.XpackBaseTreeRequest;
+import io.dataease.plugins.xpack.auth.dto.response.XpackVAuthModelDTO;
+import io.dataease.plugins.xpack.auth.service.AuthXpackService;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.SecurityUtils;
@@ -67,6 +71,20 @@ public class AuthUtils {
         return userIds;
     }
 
+    public static List<String> parentResources(String resourceId, String type) {
+        return extAuthService.parentResource(resourceId, type);
+    }
+
+    public static List<String> getAuthModels(String id, String type, Long userId, Boolean isAdmin) {
+        AuthXpackService sysAuthService = SpringContextUtil.getBean(AuthXpackService.class);
+        List<XpackVAuthModelDTO> vAuthModelDTOS = sysAuthService
+                .searchAuthModelTree(new XpackBaseTreeRequest(id, type, "children"), userId, isAdmin);
+        List<String> authSources = Optional.ofNullable(vAuthModelDTOS).orElse(new ArrayList<>()).stream()
+                .map(XpackVAuthModelDTO::getId)
+                .collect(Collectors.toList());
+        return authSources;
+    }
+
     // 获取资源对那些人/角色/组织 有权限
     public static AuthURD authURDR(String resourceId) {
         return extAuthService.resourceTarget(resourceId);
@@ -113,7 +131,7 @@ public class AuthUtils {
             result.addAll(roleSet);
             result.addAll(deptSet);
             Arrays.stream(defaultPanelPermissions).forEach(item -> {
-                result.add(new AuthItem(item, ResourceAuthLevel.PANNEL_LEVEL_MANAGE.getLevel()));
+                result.add(new AuthItem(item, ResourceAuthLevel.PANEL_LEVEL_MANAGE.getLevel()));
             });
             return result;
         }

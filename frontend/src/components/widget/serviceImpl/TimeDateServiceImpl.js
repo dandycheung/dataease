@@ -17,6 +17,7 @@ const dialogPanel = {
       placeholder: 'dedate.placeholder',
       viewIds: [],
       fieldId: '',
+      parameters: [],
       dragItems: [],
       default: {
         isDynamic: false,
@@ -29,6 +30,7 @@ const dialogPanel = {
           { value: 0, text: 'dynamic_time.today' },
           { value: 1, text: 'dynamic_time.yesterday' },
           { value: 2, text: 'dynamic_time.firstOfMonth' },
+          { value: 4, text: 'dynamic_time.firstOfYear' },
           { value: 3, text: 'dynamic_time.custom' }
         ],
         custom: {
@@ -40,7 +42,10 @@ const dialogPanel = {
           ],
           limits: [1, 12]
         }
-      }
+      },
+      showTime: false,
+      accuracy: 'HH:mm'
+
     },
     value: '',
     manualModify: false
@@ -79,7 +84,6 @@ class TimeDateServiceImpl extends WidgetService {
   initLeftPanel() {
     const value = JSON.parse(JSON.stringify(leftPanel))
     return value
-    // console.log('this is first initWidget')
   }
 
   initFilterDialog() {
@@ -99,6 +103,9 @@ class TimeDateServiceImpl extends WidgetService {
   defaultSetting() {
     return dialogPanel.options.attrs.default
   }
+  customValue() {
+    return 3
+  }
   dynamicDateFormNow(element) {
     if (element.options.attrs.default === null || typeof element.options.attrs.default === 'undefined' || !element.options.attrs.default.isDynamic) return null
 
@@ -116,6 +123,11 @@ class TimeDateServiceImpl extends WidgetService {
       const nowMonth = now.getMonth()
       var nowYear = now.getFullYear()
       return new Date(nowYear, nowMonth, 1).getTime()
+    }
+    if (element.options.attrs.default.dkey === 4) {
+      const now = new Date()
+      const nowYear = now.getFullYear()
+      return new Date(nowYear, 0, 1).getTime()
     }
 
     if (element.options.attrs.default.dkey === 3) {
@@ -177,13 +189,13 @@ class TimeDateServiceImpl extends WidgetService {
     const defaultV = element.options.value === null ? '' : element.options.value.toString()
     if (element.options.attrs.type === 'daterange') {
       if (defaultV === null || typeof defaultV === 'undefined' || defaultV === '' || defaultV ===
-          '[object Object]') {
+        '[object Object]') {
         return []
       }
       return defaultV.split(',').map(item => parseFloat(item))
     } else {
       if (defaultV === null || typeof defaultV === 'undefined' || defaultV === '' || defaultV ===
-          '[object Object]') {
+        '[object Object]') {
         return null
       }
       return parseFloat(defaultV.split(',')[0])
@@ -210,8 +222,20 @@ class TimeDateServiceImpl extends WidgetService {
       return results
     } else {
       const value = values[0]
-      return timeSection(parseFloat(value), element.options.attrs.type)
+      const componentType = element.options.attrs.showTime ? 'datetime' : 'date'
+      let labelFormat = 'yyyy-MM-dd'
+      if (element.options.attrs.showTime && element.options.attrs.accuracy) {
+        labelFormat = labelFormat + ' ' + element.options.attrs.accuracy
+      }
+
+      return timeSection(parseFloat(value), componentType || element.options.attrs.type, labelFormat)
     }
+  }
+  isTimeWidget() {
+    return true
+  }
+  isParamWidget() {
+    return true
   }
 }
 const timeDateServiceImpl = new TimeDateServiceImpl({

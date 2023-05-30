@@ -1,8 +1,8 @@
 package io.dataease.listener;
 
-import io.dataease.base.domain.DataeaseCodeVersion;
-import io.dataease.base.mapper.DataeaseCodeVersionMapper;
-import io.dataease.base.mapper.ext.DEVersionMapper;
+import io.dataease.plugins.common.base.domain.DataeaseCodeVersion;
+import io.dataease.plugins.common.base.mapper.DataeaseCodeVersionMapper;
+import io.dataease.ext.DEVersionMapper;
 import io.dataease.plugins.loader.ClassloaderResponsity;
 import io.dataease.service.panel.PanelGroupService;
 import org.slf4j.Logger;
@@ -29,7 +29,6 @@ public class SystemInitListener implements ApplicationListener<ApplicationReadyE
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent applicationReadyEvent) {
-        System.out.println("=====initSystem from code [Start]=====");
         logger.info("=====initSystem from code [Start]=====");
         Integer dataeseVersion = versionMapper.lastSuccessDataEaseVersion();
         Integer dataeseCodeVersion = versionMapper.lastDataEaseCodeVersion();
@@ -51,8 +50,6 @@ public class SystemInitListener implements ApplicationListener<ApplicationReadyE
             codeVersionMapper.insert(codeVersion);
         }
         logger.info("=====initSystem from code [End]=====");
-        System.out.println("=====initSystem from code [End]=====");
-
 
     }
 }

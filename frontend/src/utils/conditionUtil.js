@@ -1,6 +1,6 @@
-
 import { Condition } from '@/components/widget/bean/Condition'
 import { ApplicationContext } from '@/utils/ApplicationContext'
+import store from '@/store'
 
 /**
  * 判断两个conditions数组是否相同
@@ -16,8 +16,9 @@ export const isChange = (conditions1, conditions2) => {
   if (conditions1.length !== conditions2.length) return true
   let arr1 = JSON.parse(JSON.stringify(conditions1))
   let arr2 = JSON.parse(JSON.stringify(conditions2))
-  arr1 = arr1.sort((s1, s2) => s1.componentId > s2.componentId)
-  arr2 = arr2.sort((s1, s2) => s1.componentId > s2.componentId)
+  const strCodeAt = (str) => str[0].charCodeAt()
+  arr1 = arr1.sort((s1, s2) => strCodeAt(s1.componentId.trim() || s1.filedId) - strCodeAt(s2.componentId.trim() || s2.filedId))
+  arr2 = arr2.sort((s1, s2) => strCodeAt(s1.componentId.trim() || s1.filedId) - strCodeAt(s2.componentId.trim() || s2.filedId))
   return JSON.stringify(arr1) !== JSON.stringify(arr2)
 }
 
@@ -26,10 +27,22 @@ export const valueValid = condition => {
 }
 
 export const formatCondition = obj => {
-  const { component, value, operator } = obj
-  const fieldId = component.options.attrs.fieldId
+  const { component, value, operator, isTree } = obj
+
+  let fieldId = component.options.attrs.fieldId
   const viewIds = component.options.attrs.viewIds
-  const condition = new Condition(component.id, fieldId, operator, value, viewIds)
+  const parameters = component.options.attrs.parameters
+  if (isTree && !component.options.attrs.multiple && value && value.length) {
+    // 单选树
+    const val = value[0]
+    if (val) {
+      const len = val.split(',').length
+      if (len) {
+        fieldId = fieldId.split(',').slice(0, len).join(',')
+      }
+    }
+  }
+  const condition = new Condition(component.id, fieldId, operator, value, viewIds, parameters, isTree)
   return condition
 }
 
@@ -39,8 +52,8 @@ export const formatLinkageCondition = obj => {
   return condition
 }
 
-export const buildFilterMap = panelItems => {
-  const viewIdMatch = (viewIds, viewId) => !viewIds || viewIds.length === 0 || viewIds.includes(viewId)
+export const viewIdMatch = (viewIds, viewId) => !viewIds || viewIds.length === 0 || viewIds.includes(viewId)
+export const buildViewKeyMap = panelItems => {
   const result = {}
   panelItems.forEach(element => {
     if (element.type === 'view') {
@@ -54,12 +67,22 @@ export const buildFilterMap = panelItems => {
       })
     }
   })
-  panelItems.forEach(element => {
+  return result
+}
+
+export const buildViewKeyFilters = (panelItems, result) => {
+  if (!(panelItems && panelItems.length > 0)) {
+    return result
+  }
+  const buildItems = panelItems[0].canvasId === 'canvas-main' ? panelItems : store.state.componentData
+  buildItems.forEach((element, index) => {
     if (element.type !== 'custom') {
       return true
     }
+
+    let param = null
     const widget = ApplicationContext.getService(element.serviceName)
-    const param = widget.getParam(element)
+    param = widget.getParam(element)
     const condition = formatCondition(param)
     const vValid = valueValid(condition)
     const filterComponentId = condition.componentId
@@ -77,4 +100,25 @@ export const buildFilterMap = panelItems => {
     })
   })
   return result
+}
+export const buildFilterMap = panelItems => {
+  let result = buildViewKeyMap(panelItems)
+
+  result = buildViewKeyFilters(panelItems, result)
+  return result
+}
+
+export const fillElementsFilter = (panelItems, filterMap) => {
+  panelItems.forEach(element => {
+    if (element.type === 'view') {
+      element.filters = filterMap[element.propValue.viewId] || []
+    }
+    if (element.type === 'de-tabs') {
+      element.options.tabList && element.options.tabList.forEach(tab => {
+        if (tab.content && tab.content.propValue && tab.content.propValue.viewId) {
+          tab.content.filters = filterMap[tab.content.propValue.viewId] || []
+        }
+      })
+    }
+  })
 }

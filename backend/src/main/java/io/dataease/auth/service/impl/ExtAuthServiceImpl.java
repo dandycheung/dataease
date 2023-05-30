@@ -1,16 +1,14 @@
 package io.dataease.auth.service.impl;
 
-import io.dataease.auth.api.dto.CurrentUserDto;
 import io.dataease.auth.entity.AuthItem;
 import io.dataease.auth.service.ExtAuthService;
-import io.dataease.base.domain.SysAuth;
-import io.dataease.base.mapper.ext.ExtAuthMapper;
+import io.dataease.plugins.common.base.domain.SysAuth;
+import io.dataease.ext.ExtAuthMapper;
 import io.dataease.commons.constants.AuthConstants;
 import io.dataease.commons.model.AuthURD;
-import io.dataease.commons.utils.AuthUtils;
 import io.dataease.commons.utils.LogUtil;
-import io.dataease.listener.util.CacheUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -129,7 +127,7 @@ public class ExtAuthServiceImpl implements ExtAuthService {
             @CacheEvict(value = AuthConstants.USER_PANEL_NAME, key = "'user' + #userId")
     })
     public void clearUserResource(Long userId) {
-        LogUtil.info("all permission resource of user {} is cleanning...", userId);
+        LogUtil.info("all permission resource of user {} is cleaning...", userId);
     }
 
     @Caching(evict = {
@@ -138,7 +136,7 @@ public class ExtAuthServiceImpl implements ExtAuthService {
             @CacheEvict(value = AuthConstants.DEPT_PANEL_NAME, key = "'dept' + #deptId")
     })
     public void clearDeptResource(Long deptId) {
-        LogUtil.info("all permission resource of dept {} is cleanning...", deptId);
+        LogUtil.info("all permission resource of dept {} is cleaning...", deptId);
     }
 
     @Caching(evict = {
@@ -147,9 +145,23 @@ public class ExtAuthServiceImpl implements ExtAuthService {
             @CacheEvict(value = AuthConstants.ROLE_PANEL_NAME, key = "'role' + #roleId")
     })
     public void clearRoleResource(Long roleId) {
-        LogUtil.info("all permission resource of role {} is cleanning...", roleId);
+        LogUtil.info("all permission resource of role {} is cleaning...", roleId);
     }
 
-
-
+    @Override
+    public List<String> parentResource(String resourceId, String type) {
+        String s = extAuthMapper.parentResource(resourceId, type);
+        if (StringUtils.isNotBlank(s)) {
+            String[] split = s.split(",");
+            List<String> results = new ArrayList<>();
+            for (int i = 0; i < split.length; i++) {
+                String s1 = split[i];
+                if (StringUtils.isNotBlank(s1)) {
+                    results.add(s1);
+                }
+            }
+            return CollectionUtils.isEmpty(results) ? null : results;
+        }
+        return null;
+    }
 }
